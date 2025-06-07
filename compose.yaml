@@ -6,4 +6,10 @@ services:
       - 'POSTGRES_PASSWORD=password'
       - 'POSTGRES_USER=spring'
     ports:
-      - '5432'
+      - '5432:5432'
+    volumes:
+      - ./sql:/docker-entrypoint-initdb.d
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:
