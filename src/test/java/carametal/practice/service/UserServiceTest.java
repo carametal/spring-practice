@@ -7,9 +7,11 @@ import carametal.practice.entity.Role;
 import carametal.practice.entity.User;
 import carametal.practice.repository.RoleRepository;
 import carametal.practice.repository.UserRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Set;
 
@@ -26,6 +28,9 @@ class UserServiceTest extends BaseIntegrationTest {
 
     @Autowired
     private RoleRepository roleRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     private Role employeeRole;
     private Role adminRole;
@@ -47,6 +52,12 @@ class UserServiceTest extends BaseIntegrationTest {
         sysAdminRole.setCreatedBy(1L);
         sysAdminRole.setUpdatedBy(1L);
         adminRole = roleRepository.save(sysAdminRole);
+    }
+
+    @AfterEach
+    void tearDown() {
+        userRepository.deleteAll();
+        roleRepository.deleteAll();
     }
 
     @Test
@@ -132,5 +143,68 @@ class UserServiceTest extends BaseIntegrationTest {
         assertThatThrownBy(() -> userService.registerUser(request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Username already exists: testuser");
+    }
+
+    @Test
+    void registerUser_存在しないロール名指定() {
+        UserRegistrationRequest request = UserRegistrationRequest.builder()
+                .username("testuser")
+                .email("test@example.com")
+                .password("password123")
+                .roleNames(Set.of("INVALID_ROLE"))
+                .build();
+
+        UserRegistrationResponse response = userService.registerUser(request);
+
+        assertThat(response.getRoleNames()).isEmpty();
+
+        User savedUser = userRepository.findById(response.getId()).orElse(null);
+        assertThat(savedUser).isNotNull();
+        assertThat(savedUser.getRoles()).isEmpty();
+    }
+
+    @Test
+    void registerUser_一部存在しないロール名指定() {
+        UserRegistrationRequest request = UserRegistrationRequest.builder()
+                .username("testuser")
+                .email("test@example.com")
+                .password("password123")
+                .roleNames(Set.of("EMPLOYEE", "INVALID_ROLE"))
+                .build();
+
+        UserRegistrationResponse response = userService.registerUser(request);
+
+        assertThat(response.getRoleNames()).containsExactly("EMPLOYEE");
+
+        User savedUser = userRepository.findById(response.getId()).orElse(null);
+        assertThat(savedUser).isNotNull();
+        assertThat(savedUser.getRoles()).hasSize(1);
+        assertThat(savedUser.getRoles().iterator().next().getRoleName()).isEqualTo("EMPLOYEE");
+    }
+
+    @Test
+    void registerUser_パスワード暗号化検証() {
+        String rawPassword = "password123";
+        UserRegistrationRequest request = UserRegistrationRequest.builder()
+                .username("testuser")
+                .email("test@example.com")
+                .password(rawPassword)
+                .build();
+
+        UserRegistrationResponse response = userService.registerUser(request);
+
+        User savedUser = userRepository.findById(response.getId()).orElse(null);
+        assertThat(savedUser).isNotNull();
+        
+        // パスワードが暗号化されていることを確認
+        assertThat(savedUser.getPassword()).isNotEqualTo(rawPassword);
+        assertThat(savedUser.getPassword()).isNotNull();
+        assertThat(savedUser.getPassword()).isNotEmpty();
+        
+        // 暗号化されたパスワードが元のパスワードと一致することを確認
+        assertThat(passwordEncoder.matches(rawPassword, savedUser.getPassword())).isTrue();
+        
+        // 間違ったパスワードでは一致しないことを確認
+        assertThat(passwordEncoder.matches("wrongpassword", savedUser.getPassword())).isFalse();
     }
 }
