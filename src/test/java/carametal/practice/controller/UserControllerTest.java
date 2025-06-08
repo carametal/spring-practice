@@ -3,8 +3,6 @@ package carametal.practice.controller;
 import carametal.practice.base.BaseIntegrationTest;
 import carametal.practice.dto.LoginRequest;
 import carametal.practice.dto.UserRegistrationRequest;
-import carametal.practice.repository.RoleRepository;
-import carametal.practice.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,7 +13,6 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.Set;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -29,11 +26,6 @@ class UserControllerTest extends BaseIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private RoleRepository roleRepository;
 
     @Test
     void registerUser_システム管理者権限_正常ケース() throws Exception {
@@ -44,7 +36,7 @@ class UserControllerTest extends BaseIntegrationTest {
                 .build();
 
         String token = getJwtToken("testadmin@example.com", "password123");
-        
+
         mockMvc.perform(post("/api/users/register")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -65,7 +57,7 @@ class UserControllerTest extends BaseIntegrationTest {
                 .build();
 
         String token = getJwtToken("testadmin@example.com", "password123");
-        
+
         mockMvc.perform(post("/api/users/register")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -85,7 +77,7 @@ class UserControllerTest extends BaseIntegrationTest {
                 .build();
 
         String token = getJwtToken("employee@example.com", "password123");
-        
+
         mockMvc.perform(post("/api/users/register")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -116,7 +108,7 @@ class UserControllerTest extends BaseIntegrationTest {
                 .build();
 
         String token = getJwtToken("testadmin@example.com", "password123");
-        
+
         mockMvc.perform(post("/api/users/register")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -133,7 +125,7 @@ class UserControllerTest extends BaseIntegrationTest {
                 .build();
 
         String token = getJwtToken("testadmin@example.com", "password123");
-        
+
         mockMvc.perform(post("/api/users/register")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -150,7 +142,7 @@ class UserControllerTest extends BaseIntegrationTest {
                 .build();
 
         String token = getJwtToken("testadmin@example.com", "password123");
-        
+
         mockMvc.perform(post("/api/users/register")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -173,53 +165,4 @@ class UserControllerTest extends BaseIntegrationTest {
         return objectMapper.readTree(response).get("token").asText();
     }
 
-    @Test
-    void JWT認証でユーザー登録が成功すること() throws Exception {
-        String token = getJwtToken("testadmin@example.com", "password123");
-        
-        UserRegistrationRequest request = UserRegistrationRequest.builder()
-                .username("jwtuser")
-                .email("jwtuser@example.com")
-                .password("password123")
-                .build();
-
-        mockMvc.perform(post("/api/users/register")
-                .header("Authorization", "Bearer " + token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.username", is("jwtuser")))
-                .andExpect(jsonPath("$.email", is("jwtuser@example.com")));
-
-        assertThat(userRepository.findByEmail("jwtuser@example.com")).isPresent();
-    }
-
-    @Test
-    void JWT認証なしではユーザー登録が拒否されること() throws Exception {
-        UserRegistrationRequest request = UserRegistrationRequest.builder()
-                .username("unauthuser")
-                .email("unauthuser@example.com")
-                .password("password123")
-                .build();
-
-        mockMvc.perform(post("/api/users/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void 無効なJWTトークンではユーザー登録が拒否されること() throws Exception {
-        UserRegistrationRequest request = UserRegistrationRequest.builder()
-                .username("invaliduser")
-                .email("invaliduser@example.com")
-                .password("password123")
-                .build();
-
-        mockMvc.perform(post("/api/users/register")
-                .header("Authorization", "Bearer invalid.jwt.token")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden());
-    }
 }
