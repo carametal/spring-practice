@@ -12,7 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -24,13 +26,20 @@ public class UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserAuditService userAuditService;
     
     @Transactional
     public void deleteUser(Long userId, User currentUser) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
         
+        Map<String, Object> details = new HashMap<>();
+        details.put("deletedUsername", user.getUsername());
+        details.put("deletedEmail", user.getEmail());
+        
         userRepository.delete(user);
+        
+        userAuditService.logUserDeleted(currentUser.getId(), userId, details);
     }
     
     @Transactional
@@ -61,6 +70,15 @@ public class UserService {
         user.setUpdatedBy(currentUser.getId());
         
         User savedUser = userRepository.save(user);
+        
+        Map<String, Object> details = new HashMap<>();
+        details.put("username", savedUser.getUsername());
+        details.put("email", savedUser.getEmail());
+        details.put("roles", savedUser.getRoles().stream()
+                .map(Role::getRoleName)
+                .collect(Collectors.toSet()));
+        
+        userAuditService.logUserCreated(currentUser.getId(), savedUser.getId(), details);
         
         return UserRegistrationResponse.builder()
                 .id(savedUser.getId())
