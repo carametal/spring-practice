@@ -4,7 +4,6 @@ import carametal.practice.dto.UserRegistrationRequest;
 import carametal.practice.dto.UserRegistrationResponse;
 import carametal.practice.entity.Role;
 import carametal.practice.entity.User;
-import carametal.practice.repository.RoleRepository;
 import carametal.practice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,9 +22,10 @@ import java.util.stream.Collectors;
 public class UserService {
     
     private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserAuditService userAuditService;
+    private final UserValidationService userValidationService;
+    private final RoleService roleService;
     
     @Transactional
     public void deleteUser(Long userId, User currentUser) {
@@ -43,18 +43,11 @@ public class UserService {
     
     @Transactional
     public UserRegistrationResponse registerUser(UserRegistrationRequest request, User currentUser) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("Email already exists: " + request.getEmail());
-        }
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new IllegalArgumentException("Username already exists: " + request.getUsername());
-        }
+        userValidationService.validateUniqueEmail(request.getEmail());
+        userValidationService.validateUniqueUsername(request.getUsername());
+        userValidationService.validateRoleNames(request.getRoleNames());
         
-        if (request.getRoleNames() == null || request.getRoleNames().isEmpty()) {
-            throw new IllegalArgumentException("Role names are required");
-        }
-        
-        Set<Role> roles = roleRepository.findByRoleNameIn(request.getRoleNames());
+        Set<Role> roles = roleService.findRolesByNames(request.getRoleNames());
         
         User user = User.builder()
                 .username(request.getUsername())

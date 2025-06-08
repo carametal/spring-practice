@@ -33,6 +33,7 @@ class UserServiceTest extends BaseIntegrationTest {
                 .username("testuser")
                 .email("test@example.com")
                 .password("password123")
+                .roleNames(Set.of("EMPLOYEE"))
                 .build();
 
         User currentUser = userRepository.findByUsername("testadmin").orElseThrow();
@@ -109,13 +110,10 @@ class UserServiceTest extends BaseIntegrationTest {
                 .build();
 
         User currentUser = userRepository.findByUsername("testadmin").orElseThrow();
-        UserRegistrationResponse response = userService.registerUser(request, currentUser);
-
-        assertThat(response.getRoleNames()).isEmpty();
-
-        User savedUser = userRepository.findById(response.getId()).orElse(null);
-        assertThat(savedUser).isNotNull();
-        assertThat(savedUser.getRoles()).isEmpty();
+        
+        assertThatThrownBy(() -> userService.registerUser(request, currentUser))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Invalid roles: [INVALID_ROLE]");
     }
 
     @Test
@@ -128,14 +126,10 @@ class UserServiceTest extends BaseIntegrationTest {
                 .build();
 
         User currentUser = userRepository.findByUsername("testadmin").orElseThrow();
-        UserRegistrationResponse response = userService.registerUser(request, currentUser);
-
-        assertThat(response.getRoleNames()).containsExactly("EMPLOYEE");
-
-        User savedUser = userRepository.findById(response.getId()).orElse(null);
-        assertThat(savedUser).isNotNull();
-        assertThat(savedUser.getRoles()).hasSize(1);
-        assertThat(savedUser.getRoles().iterator().next().getRoleName()).isEqualTo("EMPLOYEE");
+        
+        assertThatThrownBy(() -> userService.registerUser(request, currentUser))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Invalid roles: [INVALID_ROLE]");
     }
 
     @Test
@@ -145,6 +139,7 @@ class UserServiceTest extends BaseIntegrationTest {
                 .username("testuser")
                 .email("test@example.com")
                 .password(rawPassword)
+                .roleNames(Set.of("EMPLOYEE"))
                 .build();
 
         User currentUser = userRepository.findByUsername("testadmin").orElseThrow();

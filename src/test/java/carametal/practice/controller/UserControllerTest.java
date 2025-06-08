@@ -38,6 +38,7 @@ class UserControllerTest extends BaseIntegrationTest {
                 .username("testuser")
                 .email("test@example.com")
                 .password("password123")
+                .roleNames(Set.of("EMPLOYEE"))
                 .build();
 
         String token = getJwtToken("testadmin@example.com", "password123");
@@ -79,6 +80,7 @@ class UserControllerTest extends BaseIntegrationTest {
                 .username("testuser")
                 .email("test@example.com")
                 .password("password123")
+                .roleNames(Set.of("EMPLOYEE"))
                 .build();
 
         String token = getJwtToken("employee@example.com", "password123");
@@ -96,6 +98,7 @@ class UserControllerTest extends BaseIntegrationTest {
                 .username("testuser")
                 .email("test@example.com")
                 .password("password123")
+                .roleNames(Set.of("EMPLOYEE"))
                 .build();
 
         mockMvc.perform(post("/api/users/register")
@@ -110,6 +113,7 @@ class UserControllerTest extends BaseIntegrationTest {
                 .username("")
                 .email("test@example.com")
                 .password("password123")
+                .roleNames(Set.of("EMPLOYEE"))
                 .build();
 
         String token = getJwtToken("testadmin@example.com", "password123");
@@ -127,6 +131,7 @@ class UserControllerTest extends BaseIntegrationTest {
                 .username("testuser")
                 .email("invalid-email")
                 .password("password123")
+                .roleNames(Set.of("EMPLOYEE"))
                 .build();
 
         String token = getJwtToken("testadmin@example.com", "password123");
@@ -144,6 +149,7 @@ class UserControllerTest extends BaseIntegrationTest {
                 .username("testuser")
                 .email("testadmin@example.com")
                 .password("password123")
+                .roleNames(Set.of("EMPLOYEE"))
                 .build();
 
         String token = getJwtToken("testadmin@example.com", "password123");
