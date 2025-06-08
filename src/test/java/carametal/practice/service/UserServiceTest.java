@@ -164,4 +164,25 @@ class UserServiceTest extends BaseIntegrationTest {
         // 間違ったパスワードでは一致しないことを確認
         assertThat(passwordEncoder.matches("wrongpassword", savedUser.getPassword())).isFalse();
     }
+
+    @Test
+    void deleteUser_正常ケース() {
+        User currentUser = userRepository.findByUsername("testadmin").orElseThrow();
+        User targetUser = userRepository.findByUsername("employee").orElseThrow();
+        Long targetUserId = targetUser.getId();
+
+        userService.deleteUser(targetUserId, currentUser);
+
+        assertThat(userRepository.findById(targetUserId)).isEmpty();
+    }
+
+    @Test
+    void deleteUser_存在しないユーザー() {
+        User currentUser = userRepository.findByUsername("testadmin").orElseThrow();
+        Long nonExistentUserId = 999L;
+
+        assertThatThrownBy(() -> userService.deleteUser(nonExistentUserId, currentUser))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("User not found: " + nonExistentUserId);
+    }
 }

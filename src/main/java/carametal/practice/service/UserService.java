@@ -26,6 +26,14 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     
     @Transactional
+    public void deleteUser(Long userId, User currentUser) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+        
+        userRepository.delete(user);
+    }
+    
+    @Transactional
     public UserRegistrationResponse registerUser(UserRegistrationRequest request, User currentUser) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Email already exists: " + request.getEmail());

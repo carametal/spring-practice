@@ -3,6 +3,7 @@ package carametal.practice.controller;
 import carametal.practice.base.BaseIntegrationTest;
 import carametal.practice.dto.LoginRequest;
 import carametal.practice.dto.UserRegistrationRequest;
+import carametal.practice.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +15,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.util.Set;
 
 import static org.hamcrest.Matchers.is;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -25,6 +27,9 @@ class UserControllerTest extends BaseIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private UserRepository userRepository;
 
 
     @Test
@@ -148,6 +153,48 @@ class UserControllerTest extends BaseIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deleteUser_システム管理者権限_正常ケース() throws Exception {
+        String token = getJwtToken("testadmin@example.com", "password123");
+        
+        // employeeユーザーのIDを取得
+        Long employeeId = userRepository.findByUsername("employee").orElseThrow().getId();
+
+        mockMvc.perform(delete("/api/users/" + employeeId)
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void deleteUser_存在しないユーザー() throws Exception {
+        String token = getJwtToken("testadmin@example.com", "password123");
+
+        mockMvc.perform(delete("/api/users/999")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deleteUser_従業員権限_アクセス拒否() throws Exception {
+        String token = getJwtToken("employee@example.com", "password123");
+        
+        // useradminユーザーのIDを取得
+        Long useradminId = userRepository.findByUsername("useradmin").orElseThrow().getId();
+
+        mockMvc.perform(delete("/api/users/" + useradminId)
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void deleteUser_未認証_アクセス拒否() throws Exception {
+        // useradminユーザーのIDを取得
+        Long useradminId = userRepository.findByUsername("useradmin").orElseThrow().getId();
+        
+        mockMvc.perform(delete("/api/users/" + useradminId))
+                .andExpect(status().isForbidden());
     }
 
     private String getJwtToken(String email, String password) throws Exception {

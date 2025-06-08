@@ -30,4 +30,17 @@ public class UserController {
             return ResponseEntity.badRequest().build();
         }
     }
+
+    @DeleteMapping("/{userId}")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN') or hasRole('USER_ADMIN')")
+    public ResponseEntity<Void> deleteUser(
+            @PathVariable Long userId,
+            @CurrentUser User currentUser) {
+        try {
+            userService.deleteUser(userId, currentUser);
+            return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
 }
