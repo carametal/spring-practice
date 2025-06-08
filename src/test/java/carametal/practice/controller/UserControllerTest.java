@@ -6,7 +6,6 @@ import carametal.practice.dto.UserRegistrationRequest;
 import carametal.practice.repository.RoleRepository;
 import carametal.practice.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -21,6 +20,7 @@ import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@Sql("/test-data.sql")
 class UserControllerTest extends BaseIntegrationTest {
 
     @Autowired
@@ -35,14 +35,7 @@ class UserControllerTest extends BaseIntegrationTest {
     @Autowired
     private RoleRepository roleRepository;
 
-    @AfterEach
-    void tearDown() {
-        userRepository.deleteAllInBatch();
-        roleRepository.deleteAllInBatch();
-    }
-
     @Test
-    @Sql("/test-data.sql")
     void registerUser_システム管理者権限_正常ケース() throws Exception {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("testuser")
@@ -63,7 +56,6 @@ class UserControllerTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Sql("/test-data.sql")
     void registerUser_ユーザー管理者権限_正常ケース() throws Exception {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("testuser")
@@ -85,7 +77,6 @@ class UserControllerTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Sql("/test-data.sql")
     void registerUser_従業員権限_アクセス拒否() throws Exception {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("testuser")
@@ -117,7 +108,6 @@ class UserControllerTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Sql("/test-data.sql")
     void registerUser_バリデーションエラー_空のユーザー名() throws Exception {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("")
@@ -135,7 +125,6 @@ class UserControllerTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Sql("/test-data.sql")
     void registerUser_バリデーションエラー_無効なメールアドレス() throws Exception {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("testuser")
@@ -153,7 +142,6 @@ class UserControllerTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Sql("/test-data.sql")
     void registerUser_重複エラー() throws Exception {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("testuser")
@@ -186,7 +174,6 @@ class UserControllerTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Sql("/test-data.sql")
     void JWT認証でユーザー登録が成功すること() throws Exception {
         String token = getJwtToken("testadmin@example.com", "password123");
         
@@ -208,7 +195,6 @@ class UserControllerTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Sql("/test-data.sql")
     void JWT認証なしではユーザー登録が拒否されること() throws Exception {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("unauthuser")
@@ -223,7 +209,6 @@ class UserControllerTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Sql("/test-data.sql")
     void 無効なJWTトークンではユーザー登録が拒否されること() throws Exception {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("invaliduser")

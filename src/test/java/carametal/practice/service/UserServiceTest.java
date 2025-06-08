@@ -5,7 +5,6 @@ import carametal.practice.dto.UserRegistrationRequest;
 import carametal.practice.dto.UserRegistrationResponse;
 import carametal.practice.entity.User;
 import carametal.practice.repository.UserRepository;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,6 +15,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@Sql("/test-data.sql")
 class UserServiceTest extends BaseIntegrationTest {
 
     @Autowired
@@ -27,13 +27,7 @@ class UserServiceTest extends BaseIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @AfterEach
-    void tearDown() {
-        userRepository.deleteAllInBatch();
-    }
-
     @Test
-    @Sql("/test-data.sql")
     void registerUser_正常ケース_デフォルトロール() {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("testuser")
@@ -57,7 +51,6 @@ class UserServiceTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Sql("/test-data.sql")
     void registerUser_正常ケース_指定ロール() {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("adminuser")
@@ -78,7 +71,6 @@ class UserServiceTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Sql("/test-data.sql")
     void registerUser_メール重複エラー() {
 
         UserRegistrationRequest request = UserRegistrationRequest.builder()
@@ -94,7 +86,6 @@ class UserServiceTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Sql("/test-data.sql")
     void registerUser_ユーザー名重複エラー() {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("testadmin")
@@ -109,7 +100,6 @@ class UserServiceTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Sql("/test-data.sql")
     void registerUser_存在しないロール名指定() {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("testuser")
@@ -129,7 +119,6 @@ class UserServiceTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Sql("/test-data.sql")
     void registerUser_一部存在しないロール名指定() {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("testuser")
@@ -150,7 +139,6 @@ class UserServiceTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Sql("/test-data.sql")
     void registerUser_パスワード暗号化検証() {
         String rawPassword = "password123";
         UserRegistrationRequest request = UserRegistrationRequest.builder()
