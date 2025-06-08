@@ -13,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -51,12 +50,11 @@ public class UserService {
             throw new IllegalArgumentException("Username already exists: " + request.getUsername());
         }
         
-        Set<Role> roles = new HashSet<>();
-        if (request.getRoleNames() != null && !request.getRoleNames().isEmpty()) {
-            roles = roleRepository.findByRoleNameIn(request.getRoleNames());
-        } else {
-            roleRepository.findByRoleName("EMPLOYEE").ifPresent(roles::add);
+        if (request.getRoleNames() == null || request.getRoleNames().isEmpty()) {
+            throw new IllegalArgumentException("Role names are required");
         }
+        
+        Set<Role> roles = roleRepository.findByRoleNameIn(request.getRoleNames());
         
         User user = User.builder()
                 .username(request.getUsername())
