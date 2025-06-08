@@ -32,4 +32,9 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .authorities(authorities)
                 .build();
     }
+    
+    public User getUserByUsername(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+    }
 }

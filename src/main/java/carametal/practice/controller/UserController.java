@@ -1,7 +1,9 @@
 package carametal.practice.controller;
 
+import carametal.practice.annotation.CurrentUser;
 import carametal.practice.dto.UserRegistrationRequest;
 import carametal.practice.dto.UserRegistrationResponse;
+import carametal.practice.entity.User;
 import carametal.practice.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,9 +20,11 @@ public class UserController {
 
     @PostMapping("/register")
     @PreAuthorize("hasRole('SYSTEM_ADMIN') or hasRole('USER_ADMIN')")
-    public ResponseEntity<UserRegistrationResponse> registerUser(@Valid @RequestBody UserRegistrationRequest request) {
+    public ResponseEntity<UserRegistrationResponse> registerUser(
+            @Valid @RequestBody UserRegistrationRequest request,
+            @CurrentUser User currentUser) {
         try {
-            UserRegistrationResponse response = userService.registerUser(request);
+            UserRegistrationResponse response = userService.registerUser(request, currentUser);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();

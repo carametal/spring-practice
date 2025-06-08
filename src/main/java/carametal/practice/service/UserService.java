@@ -26,7 +26,7 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     
     @Transactional
-    public UserRegistrationResponse registerUser(UserRegistrationRequest request) {
+    public UserRegistrationResponse registerUser(UserRegistrationRequest request, User currentUser) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Email already exists: " + request.getEmail());
         }
@@ -49,8 +49,8 @@ public class UserService {
                 .roles(roles)
                 .build();
         
-        user.setCreatedBy(1L);
-        user.setUpdatedBy(1L);
+        user.setCreatedBy(currentUser.getId());
+        user.setUpdatedBy(currentUser.getId());
         
         User savedUser = userRepository.save(user);
         

@@ -3,23 +3,17 @@ package carametal.practice.controller;
 import carametal.practice.base.BaseIntegrationTest;
 import carametal.practice.dto.LoginRequest;
 import carametal.practice.dto.UserRegistrationRequest;
-import carametal.practice.entity.Role;
-import carametal.practice.entity.User;
 import carametal.practice.repository.RoleRepository;
 import carametal.practice.repository.UserRepository;
-import carametal.practice.util.JwtUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import java.time.LocalDateTime;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,52 +35,14 @@ class UserControllerTest extends BaseIntegrationTest {
     @Autowired
     private RoleRepository roleRepository;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private JwtUtil jwtUtil;
-
-    @Autowired
-    private UserDetailsService userDetailsService;
-
-    private Role employeeRole;
-    private Role adminRole;
-    private User testAdminUser;
-
-    @BeforeEach
-    void setUp() {
-        Role empRole = Role.builder()
-                .roleName("EMPLOYEE")
-                .description("従業員")
-                .build();
-        empRole.setCreatedBy(1L);
-        empRole.setUpdatedBy(1L);
-        employeeRole = roleRepository.save(empRole);
-
-        Role sysAdminRole = Role.builder()
-                .roleName("SYSTEM_ADMIN")
-                .description("システム管理者")
-                .build();
-        sysAdminRole.setCreatedBy(1L);
-        sysAdminRole.setUpdatedBy(1L);
-        adminRole = roleRepository.save(sysAdminRole);
-
-        // JWT認証テスト用の管理者ユーザーを作成
-        testAdminUser = User.builder()
-                .username("admin")
-                .email("admin@example.com")
-                .password(passwordEncoder.encode("adminpass"))
-                .registrationDate(LocalDateTime.now())
-                .roles(Set.of(adminRole))
-                .build();
-        testAdminUser.setCreatedBy(1L);
-        testAdminUser.setUpdatedBy(1L);
-        userRepository.save(testAdminUser);
+    @AfterEach
+    void tearDown() {
+        userRepository.deleteAllInBatch();
+        roleRepository.deleteAllInBatch();
     }
 
     @Test
-    @WithMockUser(roles = "SYSTEM_ADMIN")
+    @Sql("/test-data.sql")
     void registerUser_システム管理者権限_正常ケース() throws Exception {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("testuser")
@@ -94,7 +50,10 @@ class UserControllerTest extends BaseIntegrationTest {
                 .password("password123")
                 .build();
 
+        String token = getJwtToken("testadmin@example.com", "password123");
+        
         mockMvc.perform(post("/api/users/register")
+                .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -104,7 +63,7 @@ class UserControllerTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "USER_ADMIN")
+    @Sql("/test-data.sql")
     void registerUser_ユーザー管理者権限_正常ケース() throws Exception {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("testuser")
@@ -113,7 +72,10 @@ class UserControllerTest extends BaseIntegrationTest {
                 .roleNames(Set.of("SYSTEM_ADMIN"))
                 .build();
 
+        String token = getJwtToken("testadmin@example.com", "password123");
+        
         mockMvc.perform(post("/api/users/register")
+                .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -123,7 +85,7 @@ class UserControllerTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "EMPLOYEE")
+    @Sql("/test-data.sql")
     void registerUser_従業員権限_アクセス拒否() throws Exception {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("testuser")
@@ -131,7 +93,10 @@ class UserControllerTest extends BaseIntegrationTest {
                 .password("password123")
                 .build();
 
+        String token = getJwtToken("employee@example.com", "password123");
+        
         mockMvc.perform(post("/api/users/register")
+                .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
@@ -152,7 +117,7 @@ class UserControllerTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "SYSTEM_ADMIN")
+    @Sql("/test-data.sql")
     void registerUser_バリデーションエラー_空のユーザー名() throws Exception {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("")
@@ -160,14 +125,17 @@ class UserControllerTest extends BaseIntegrationTest {
                 .password("password123")
                 .build();
 
+        String token = getJwtToken("testadmin@example.com", "password123");
+        
         mockMvc.perform(post("/api/users/register")
+                .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    @WithMockUser(roles = "SYSTEM_ADMIN")
+    @Sql("/test-data.sql")
     void registerUser_バリデーションエラー_無効なメールアドレス() throws Exception {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("testuser")
@@ -175,40 +143,37 @@ class UserControllerTest extends BaseIntegrationTest {
                 .password("password123")
                 .build();
 
+        String token = getJwtToken("testadmin@example.com", "password123");
+        
         mockMvc.perform(post("/api/users/register")
+                .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    @WithMockUser(roles = "SYSTEM_ADMIN")
+    @Sql("/test-data.sql")
     void registerUser_重複エラー() throws Exception {
-        User existingUser = User.builder()
-                .username("existing")
-                .email("test@example.com")
-                .password("password")
-                .build();
-        existingUser.setCreatedBy(1L);
-        existingUser.setUpdatedBy(1L);
-        userRepository.save(existingUser);
-
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("testuser")
-                .email("test@example.com")
+                .email("testadmin@example.com")
                 .password("password123")
                 .build();
 
+        String token = getJwtToken("testadmin@example.com", "password123");
+        
         mockMvc.perform(post("/api/users/register")
+                .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
     }
 
-    private String getJwtToken() throws Exception {
+    private String getJwtToken(String email, String password) throws Exception {
         LoginRequest loginRequest = new LoginRequest();
-        loginRequest.setEmail("admin@example.com");
-        loginRequest.setPassword("adminpass");
+        loginRequest.setEmail(email);
+        loginRequest.setPassword(password);
 
         MvcResult result = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -221,8 +186,9 @@ class UserControllerTest extends BaseIntegrationTest {
     }
 
     @Test
+    @Sql("/test-data.sql")
     void JWT認証でユーザー登録が成功すること() throws Exception {
-        String token = getJwtToken();
+        String token = getJwtToken("testadmin@example.com", "password123");
         
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("jwtuser")
@@ -242,6 +208,7 @@ class UserControllerTest extends BaseIntegrationTest {
     }
 
     @Test
+    @Sql("/test-data.sql")
     void JWT認証なしではユーザー登録が拒否されること() throws Exception {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("unauthuser")
@@ -256,6 +223,7 @@ class UserControllerTest extends BaseIntegrationTest {
     }
 
     @Test
+    @Sql("/test-data.sql")
     void 無効なJWTトークンではユーザー登録が拒否されること() throws Exception {
         UserRegistrationRequest request = UserRegistrationRequest.builder()
                 .username("invaliduser")
