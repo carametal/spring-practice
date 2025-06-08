@@ -12,9 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@TestPropertySource(properties = {
-    "spring.jpa.hibernate.ddl-auto=create-drop"
-})
+@TestPropertySource(locations = "classpath:application-test.properties")
 @Transactional
 public abstract class BaseIntegrationTest {
 }
