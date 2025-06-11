@@ -3,6 +3,8 @@ package carametal.practice.controller;
 import carametal.practice.annotation.CurrentUser;
 import carametal.practice.dto.UserRegistrationRequest;
 import carametal.practice.dto.UserRegistrationResponse;
+import carametal.practice.dto.UserUpdateRequest;
+import carametal.practice.dto.UserUpdateResponse;
 import carametal.practice.entity.User;
 import carametal.practice.service.UserService;
 import jakarta.validation.Valid;
@@ -27,6 +29,23 @@ public class UserController {
             UserRegistrationResponse response = userService.registerUser(request, currentUser);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PutMapping("/{userId}")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN') or hasRole('USER_ADMIN')")
+    public ResponseEntity<UserUpdateResponse> updateUser(
+            @PathVariable Long userId,
+            @Valid @RequestBody UserUpdateRequest request,
+            @CurrentUser User currentUser) {
+        try {
+            UserUpdateResponse response = userService.updateUser(userId, request, currentUser);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            if (e.getMessage().contains("not found")) {
+                return ResponseEntity.notFound().build();
+            }
             return ResponseEntity.badRequest().build();
         }
     }

@@ -2,6 +2,8 @@ package carametal.practice.service;
 
 import carametal.practice.dto.UserRegistrationRequest;
 import carametal.practice.dto.UserRegistrationResponse;
+import carametal.practice.dto.UserUpdateRequest;
+import carametal.practice.dto.UserUpdateResponse;
 import carametal.practice.entity.Role;
 import carametal.practice.entity.User;
 import carametal.practice.repository.UserRepository;
@@ -77,6 +79,59 @@ public class UserService {
                 .email(savedUser.getEmail())
                 .registrationDate(savedUser.getRegistrationDate())
                 .roleNames(savedUser.getRoles().stream()
+                        .map(Role::getRoleName)
+                        .collect(Collectors.toSet()))
+                .build();
+    }
+    
+    @Transactional
+    public UserUpdateResponse updateUser(Long userId, UserUpdateRequest request, User currentUser) {
+        User existingUser = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+        
+        if (!existingUser.getUsername().equals(request.getUsername())) {
+            userValidationService.validateUniqueUsername(request.getUsername());
+        }
+        
+        if (!existingUser.getEmail().equals(request.getEmail())) {
+            userValidationService.validateUniqueEmail(request.getEmail());
+        }
+        
+        userValidationService.validateRoleNames(request.getRoleNames());
+        
+        Set<Role> roles = roleService.findRolesByNames(request.getRoleNames());
+        
+        Map<String, Object> oldDetails = new HashMap<>();
+        oldDetails.put("oldUsername", existingUser.getUsername());
+        oldDetails.put("oldEmail", existingUser.getEmail());
+        oldDetails.put("oldRoles", existingUser.getRoles().stream()
+                .map(Role::getRoleName)
+                .collect(Collectors.toSet()));
+        
+        existingUser.setUsername(request.getUsername());
+        existingUser.setEmail(request.getEmail());
+        existingUser.setRoles(roles);
+        existingUser.setUpdatedBy(currentUser.getId());
+        
+        User updatedUser = userRepository.save(existingUser);
+        
+        Map<String, Object> newDetails = new HashMap<>();
+        newDetails.put("newUsername", updatedUser.getUsername());
+        newDetails.put("newEmail", updatedUser.getEmail());
+        newDetails.put("newRoles", updatedUser.getRoles().stream()
+                .map(Role::getRoleName)
+                .collect(Collectors.toSet()));
+        newDetails.putAll(oldDetails);
+        
+        userAuditService.logUserUpdated(currentUser.getId(), updatedUser.getId(), newDetails);
+        
+        return UserUpdateResponse.builder()
+                .id(updatedUser.getId())
+                .username(updatedUser.getUsername())
+                .email(updatedUser.getEmail())
+                .registrationDate(updatedUser.getRegistrationDate())
+                .lastUpdated(updatedUser.getUpdatedAt())
+                .roleNames(updatedUser.getRoles().stream()
                         .map(Role::getRoleName)
                         .collect(Collectors.toSet()))
                 .build();

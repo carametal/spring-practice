@@ -3,6 +3,7 @@ package carametal.practice.controller;
 import carametal.practice.base.BaseIntegrationTest;
 import carametal.practice.dto.LoginRequest;
 import carametal.practice.dto.UserRegistrationRequest;
+import carametal.practice.dto.UserUpdateRequest;
 import carametal.practice.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ import java.util.Set;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @Sql("/test-data.sql")
@@ -201,6 +203,171 @@ class UserControllerTest extends BaseIntegrationTest {
         
         mockMvc.perform(delete("/api/users/" + useradminId))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void updateUser_システム管理者権限_正常ケース() throws Exception {
+        UserUpdateRequest request = UserUpdateRequest.builder()
+                .username("updated_employee")
+                .email("updated@example.com")
+                .roleNames(Set.of("USER_ADMIN"))
+                .build();
+
+        String token = getJwtToken("testadmin@example.com", "password123");
+        Long employeeId = userRepository.findByUsername("employee").orElseThrow().getId();
+
+        mockMvc.perform(put("/api/users/" + employeeId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username", is("updated_employee")))
+                .andExpect(jsonPath("$.email", is("updated@example.com")))
+                .andExpect(jsonPath("$.roleNames[0]", is("USER_ADMIN")));
+    }
+
+    @Test
+    void updateUser_ユーザー管理者権限_正常ケース() throws Exception {
+        UserUpdateRequest request = UserUpdateRequest.builder()
+                .username("updated_employee2")
+                .email("updated2@example.com")
+                .roleNames(Set.of("EMPLOYEE"))
+                .build();
+
+        String token = getJwtToken("useradmin@example.com", "password123");
+        Long employeeId = userRepository.findByUsername("employee").orElseThrow().getId();
+
+        mockMvc.perform(put("/api/users/" + employeeId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username", is("updated_employee2")))
+                .andExpect(jsonPath("$.email", is("updated2@example.com")))
+                .andExpect(jsonPath("$.roleNames[0]", is("EMPLOYEE")));
+    }
+
+    @Test
+    void updateUser_存在しないユーザー() throws Exception {
+        UserUpdateRequest request = UserUpdateRequest.builder()
+                .username("updated_user")
+                .email("updated@example.com")
+                .roleNames(Set.of("EMPLOYEE"))
+                .build();
+
+        String token = getJwtToken("testadmin@example.com", "password123");
+
+        mockMvc.perform(put("/api/users/999")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void updateUser_従業員権限_アクセス拒否() throws Exception {
+        UserUpdateRequest request = UserUpdateRequest.builder()
+                .username("updated_user")
+                .email("updated@example.com")
+                .roleNames(Set.of("EMPLOYEE"))
+                .build();
+
+        String token = getJwtToken("employee@example.com", "password123");
+        Long useradminId = userRepository.findByUsername("useradmin").orElseThrow().getId();
+
+        mockMvc.perform(put("/api/users/" + useradminId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void updateUser_未認証_アクセス拒否() throws Exception {
+        UserUpdateRequest request = UserUpdateRequest.builder()
+                .username("updated_user")
+                .email("updated@example.com")
+                .roleNames(Set.of("EMPLOYEE"))
+                .build();
+
+        Long useradminId = userRepository.findByUsername("useradmin").orElseThrow().getId();
+
+        mockMvc.perform(put("/api/users/" + useradminId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void updateUser_バリデーションエラー_空のユーザー名() throws Exception {
+        UserUpdateRequest request = UserUpdateRequest.builder()
+                .username("")
+                .email("updated@example.com")
+                .roleNames(Set.of("EMPLOYEE"))
+                .build();
+
+        String token = getJwtToken("testadmin@example.com", "password123");
+        Long employeeId = userRepository.findByUsername("employee").orElseThrow().getId();
+
+        mockMvc.perform(put("/api/users/" + employeeId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void updateUser_バリデーションエラー_無効なメールアドレス() throws Exception {
+        UserUpdateRequest request = UserUpdateRequest.builder()
+                .username("updated_user")
+                .email("invalid-email")
+                .roleNames(Set.of("EMPLOYEE"))
+                .build();
+
+        String token = getJwtToken("testadmin@example.com", "password123");
+        Long employeeId = userRepository.findByUsername("employee").orElseThrow().getId();
+
+        mockMvc.perform(put("/api/users/" + employeeId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void updateUser_重複エラー_ユーザー名() throws Exception {
+        UserUpdateRequest request = UserUpdateRequest.builder()
+                .username("testadmin")
+                .email("updated@example.com")
+                .roleNames(Set.of("EMPLOYEE"))
+                .build();
+
+        String token = getJwtToken("testadmin@example.com", "password123");
+        Long employeeId = userRepository.findByUsername("employee").orElseThrow().getId();
+
+        mockMvc.perform(put("/api/users/" + employeeId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void updateUser_重複エラー_メールアドレス() throws Exception {
+        UserUpdateRequest request = UserUpdateRequest.builder()
+                .username("updated_employee")
+                .email("testadmin@example.com")
+                .roleNames(Set.of("EMPLOYEE"))
+                .build();
+
+        String token = getJwtToken("testadmin@example.com", "password123");
+        Long employeeId = userRepository.findByUsername("employee").orElseThrow().getId();
+
+        mockMvc.perform(put("/api/users/" + employeeId)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
     }
 
     private String getJwtToken(String email, String password) throws Exception {
