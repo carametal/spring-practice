@@ -18,6 +18,7 @@ This is a Spring Boot 3.5.0 practice application using:
 ```bash
 ./gradlew bootRun
 ```
+*Note: Spring Boot's Docker Compose integration automatically starts the database when running bootRun*
 
 **Run tests:**
 ```bash
