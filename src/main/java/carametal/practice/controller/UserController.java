@@ -6,7 +6,7 @@ import carametal.practice.dto.UserRegistrationResponse;
 import carametal.practice.dto.UserUpdateRequest;
 import carametal.practice.dto.UserUpdateResponse;
 import carametal.practice.entity.User;
-import carametal.practice.service.UserService;
+import carametal.practice.application.UserApplicationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class UserController {
 
-    private final UserService userService;
+    private final UserApplicationService userApplicationService;
 
     @PostMapping("/register")
     @PreAuthorize("hasRole('SYSTEM_ADMIN') or hasRole('USER_ADMIN')")
@@ -26,7 +26,7 @@ public class UserController {
             @Valid @RequestBody UserRegistrationRequest request,
             @CurrentUser User currentUser) {
         try {
-            UserRegistrationResponse response = userService.registerUser(request, currentUser);
+            UserRegistrationResponse response = userApplicationService.registerUser(request, currentUser);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
@@ -40,7 +40,7 @@ public class UserController {
             @Valid @RequestBody UserUpdateRequest request,
             @CurrentUser User currentUser) {
         try {
-            UserUpdateResponse response = userService.updateUser(userId, request, currentUser);
+            UserUpdateResponse response = userApplicationService.updateUser(userId, request, currentUser);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             if (e.getMessage().contains("not found")) {
@@ -56,7 +56,7 @@ public class UserController {
             @PathVariable Long userId,
             @CurrentUser User currentUser) {
         try {
-            userService.deleteUser(userId, currentUser);
+            userApplicationService.deleteUser(userId, currentUser);
             return ResponseEntity.noContent().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
