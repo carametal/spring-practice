@@ -9,6 +9,7 @@ import carametal.practice.domain.valueobject.Username;
 import carametal.practice.entity.Role;
 import carametal.practice.entity.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -22,6 +23,7 @@ public class UserDomainService {
     
     private final UserUniquenessChecker uniquenessChecker;
     private final PasswordEncoder passwordEncoder;
+    private final ApplicationEventPublisher eventPublisher;
     
     public User createUser(Username username, Email email, Password password, 
                           Set<Role> roles, Long createdBy) {
@@ -41,8 +43,8 @@ public class UserDomainService {
         return user;
     }
     
-    public UserCreatedEvent createUserCreatedEvent(User user, Long createdBy) {
-        return UserCreatedEvent.builder()
+    public void publishUserCreatedEvent(User user, Long createdBy) {
+        UserCreatedEvent event = UserCreatedEvent.builder()
                 .userId(user.getId())
                 .createdBy(createdBy)
                 .username(new Username(user.getUsername()))
@@ -52,46 +54,50 @@ public class UserDomainService {
                         .collect(Collectors.toSet()))
                 .occurredAt(LocalDateTime.now())
                 .build();
+        
+        eventPublisher.publishEvent(event);
     }
     
-    public UserUpdatedEvent updateUser(User existingUser, Username newUsername, 
-                                     Email newEmail, Set<Role> newRoles, Long updatedBy) {
-        Username oldUsername = new Username(existingUser.getUsername());
-        Email oldEmail = new Email(existingUser.getEmail());
-        Set<String> oldRoleNames = existingUser.getRoles().stream()
-                .map(Role::getRoleName)
-                .collect(Collectors.toSet());
-        
+    
+    public void updateUser(User existingUser, Username newUsername, 
+                          Email newEmail, Set<Role> newRoles, Long updatedBy) {
         validateUniqueConstraintsForUpdate(existingUser.getId(), newUsername, newEmail);
         
         existingUser.setUsername(newUsername.getValue());
         existingUser.setEmail(newEmail.getValue());
         existingUser.setRoles(newRoles);
         existingUser.setUpdatedBy(updatedBy);
-        
-        return UserUpdatedEvent.builder()
-                .userId(existingUser.getId())
+    }
+    
+    public void publishUserUpdatedEvent(User user, Username oldUsername, Email oldEmail, 
+                                       Set<String> oldRoleNames, Long updatedBy) {
+        UserUpdatedEvent event = UserUpdatedEvent.builder()
+                .userId(user.getId())
                 .updatedBy(updatedBy)
                 .oldUsername(oldUsername)
-                .newUsername(newUsername)
+                .newUsername(new Username(user.getUsername()))
                 .oldEmail(oldEmail)
-                .newEmail(newEmail)
+                .newEmail(new Email(user.getEmail()))
                 .oldRoleNames(oldRoleNames)
-                .newRoleNames(newRoles.stream()
+                .newRoleNames(user.getRoles().stream()
                         .map(Role::getRoleName)
                         .collect(Collectors.toSet()))
                 .occurredAt(LocalDateTime.now())
                 .build();
+        
+        eventPublisher.publishEvent(event);
     }
     
-    public UserDeletedEvent createUserDeletedEvent(User user, Long deletedBy) {
-        return UserDeletedEvent.builder()
+    public void publishUserDeletedEvent(User user, Long deletedBy) {
+        UserDeletedEvent event = UserDeletedEvent.builder()
                 .userId(user.getId())
                 .deletedBy(deletedBy)
                 .username(new Username(user.getUsername()))
                 .email(new Email(user.getEmail()))
                 .occurredAt(LocalDateTime.now())
                 .build();
+        
+        eventPublisher.publishEvent(event);
     }
     
     private void validateUniqueConstraints(Username username, Email email) {

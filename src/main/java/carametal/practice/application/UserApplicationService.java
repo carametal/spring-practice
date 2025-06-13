@@ -1,8 +1,5 @@
 package carametal.practice.application;
 
-import carametal.practice.domain.event.UserCreatedEvent;
-import carametal.practice.domain.event.UserDeletedEvent;
-import carametal.practice.domain.event.UserUpdatedEvent;
 import carametal.practice.domain.service.UserDomainService;
 import carametal.practice.domain.valueobject.Email;
 import carametal.practice.domain.valueobject.Password;
@@ -15,14 +12,10 @@ import carametal.practice.entity.Role;
 import carametal.practice.entity.User;
 import carametal.practice.repository.UserRepository;
 import carametal.practice.service.RoleService;
-import carametal.practice.service.UserAuditService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -34,8 +27,6 @@ public class UserApplicationService {
     private final UserRepository userRepository;
     private final UserDomainService userDomainService;
     private final RoleService roleService;
-    private final UserAuditService userAuditService;
-    private final ApplicationEventPublisher eventPublisher;
     
     @Transactional
     public UserRegistrationResponse registerUser(UserRegistrationRequest request, User currentUser) {
@@ -53,8 +44,7 @@ public class UserApplicationService {
         User savedUser = userRepository.save(user);
         
         // ドメインイベント発行
-        UserCreatedEvent event = userDomainService.createUserCreatedEvent(savedUser, currentUser.getId());
-        publishAuditEvent(event);
+        userDomainService.publishUserCreatedEvent(savedUser, currentUser.getId());
         
         return toRegistrationResponse(savedUser);
     }
@@ -72,14 +62,22 @@ public class UserApplicationService {
         validateRoleNames(request.getRoleNames());
         Set<Role> newRoles = roleService.findRolesByNames(request.getRoleNames());
         
+        // 更新前の値を保存
+        Username oldUsername = new Username(existingUser.getUsername());
+        Email oldEmail = new Email(existingUser.getEmail());
+        Set<String> oldRoleNames = existingUser.getRoles().stream()
+                .map(Role::getRoleName)
+                .collect(Collectors.toSet());
+        
         // ドメインサービスで更新
-        UserUpdatedEvent event = userDomainService.updateUser(
+        userDomainService.updateUser(
                 existingUser, newUsername, newEmail, newRoles, currentUser.getId());
         
         User updatedUser = userRepository.save(existingUser);
         
         // ドメインイベント発行
-        publishAuditEvent(event);
+        userDomainService.publishUserUpdatedEvent(
+                updatedUser, oldUsername, oldEmail, oldRoleNames, currentUser.getId());
         
         return toUpdateResponse(updatedUser);
     }
@@ -89,13 +87,10 @@ public class UserApplicationService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
         
-        // ドメインイベント作成
-        UserDeletedEvent event = userDomainService.createUserDeletedEvent(user, currentUser.getId());
+        // ドメインイベント発行
+        userDomainService.publishUserDeletedEvent(user, currentUser.getId());
         
         userRepository.delete(user);
-        
-        // ドメインイベント発行
-        publishAuditEvent(event);
     }
     
     private void validateRoleNames(Set<String> roleNames) {
@@ -104,34 +99,6 @@ public class UserApplicationService {
         }
     }
     
-    private void publishAuditEvent(UserCreatedEvent event) {
-        Map<String, Object> details = new HashMap<>();
-        details.put("username", event.getUsername().getValue());
-        details.put("email", event.getEmail().getValue());
-        details.put("roles", event.getRoleNames());
-        
-        userAuditService.logUserCreated(event.getCreatedBy(), event.getUserId(), details);
-    }
-    
-    private void publishAuditEvent(UserUpdatedEvent event) {
-        Map<String, Object> details = new HashMap<>();
-        details.put("oldUsername", event.getOldUsername().getValue());
-        details.put("oldEmail", event.getOldEmail().getValue());
-        details.put("oldRoles", event.getOldRoleNames());
-        details.put("newUsername", event.getNewUsername().getValue());
-        details.put("newEmail", event.getNewEmail().getValue());
-        details.put("newRoles", event.getNewRoleNames());
-        
-        userAuditService.logUserUpdated(event.getUpdatedBy(), event.getUserId(), details);
-    }
-    
-    private void publishAuditEvent(UserDeletedEvent event) {
-        Map<String, Object> details = new HashMap<>();
-        details.put("deletedUsername", event.getUsername().getValue());
-        details.put("deletedEmail", event.getEmail().getValue());
-        
-        userAuditService.logUserDeleted(event.getDeletedBy(), event.getUserId(), details);
-    }
     
     private UserRegistrationResponse toRegistrationResponse(User user) {
         return UserRegistrationResponse.builder()

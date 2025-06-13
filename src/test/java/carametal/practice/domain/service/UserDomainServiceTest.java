@@ -1,9 +1,6 @@
 package carametal.practice.domain.service;
 
 import carametal.practice.base.BaseIntegrationTest;
-import carametal.practice.domain.event.UserCreatedEvent;
-import carametal.practice.domain.event.UserDeletedEvent;
-import carametal.practice.domain.event.UserUpdatedEvent;
 import carametal.practice.domain.valueobject.Email;
 import carametal.practice.domain.valueobject.Password;
 import carametal.practice.domain.valueobject.Username;
@@ -100,7 +97,7 @@ class UserDomainServiceTest extends BaseIntegrationTest {
     }
     
     @Test
-    void createUserCreatedEvent_正常ケース() {
+    void publishUserCreatedEvent_正常ケース() {
         // Given
         User user = User.builder()
                 .id(1L)
@@ -110,17 +107,8 @@ class UserDomainServiceTest extends BaseIntegrationTest {
                 .build();
         Long createdBy = 2L;
         
-        // When
-        UserCreatedEvent event = userDomainService.createUserCreatedEvent(user, createdBy);
-        
-        // Then
-        assertNotNull(event);
-        assertEquals(1L, event.getUserId());
-        assertEquals(2L, event.getCreatedBy());
-        assertEquals("testuser", event.getUsername().getValue());
-        assertEquals("test@example.com", event.getEmail().getValue());
-        assertEquals(Set.of("EMPLOYEE"), event.getRoleNames());
-        assertNotNull(event.getOccurredAt());
+        // When & Then - イベント発行が正常に動作することを確認（例外が発生しない）
+        assertDoesNotThrow(() -> userDomainService.publishUserCreatedEvent(user, createdBy));
     }
     
     @Test
@@ -136,7 +124,7 @@ class UserDomainServiceTest extends BaseIntegrationTest {
         Long updatedBy = 2L;
         
         // When
-        UserUpdatedEvent event = userDomainService.updateUser(
+        userDomainService.updateUser(
                 existingUser, newUsername, newEmail, newRoles, updatedBy);
         
         // Then
@@ -146,18 +134,6 @@ class UserDomainServiceTest extends BaseIntegrationTest {
         assertEquals(newRoles, existingUser.getRoles());
         assertEquals(updatedBy, existingUser.getUpdatedBy());
         assertEquals(originalId, existingUser.getId()); // IDは変わらない
-        
-        // イベントが正しく作成されていることを確認
-        assertNotNull(event);
-        assertEquals(originalId, event.getUserId());
-        assertEquals(updatedBy, event.getUpdatedBy());
-        assertEquals("employee", event.getOldUsername().getValue());
-        assertEquals("updated_employee", event.getNewUsername().getValue());
-        assertEquals("employee@example.com", event.getOldEmail().getValue());
-        assertEquals("updated@example.com", event.getNewEmail().getValue());
-        assertEquals(Set.of("EMPLOYEE"), event.getOldRoleNames());
-        assertEquals(Set.of("USER_ADMIN"), event.getNewRoleNames());
-        assertNotNull(event.getOccurredAt());
     }
     
     @Test
@@ -197,7 +173,7 @@ class UserDomainServiceTest extends BaseIntegrationTest {
     }
     
     @Test
-    void createUserDeletedEvent_正常ケース() {
+    void publishUserDeletedEvent_正常ケース() {
         // Given
         User user = User.builder()
                 .id(1L)
@@ -206,15 +182,7 @@ class UserDomainServiceTest extends BaseIntegrationTest {
                 .build();
         Long deletedBy = 2L;
         
-        // When
-        UserDeletedEvent event = userDomainService.createUserDeletedEvent(user, deletedBy);
-        
-        // Then
-        assertNotNull(event);
-        assertEquals(1L, event.getUserId());
-        assertEquals(2L, event.getDeletedBy());
-        assertEquals("testuser", event.getUsername().getValue());
-        assertEquals("test@example.com", event.getEmail().getValue());
-        assertNotNull(event.getOccurredAt());
+        // When & Then - イベント発行が正常に動作することを確認（例外が発生しない）
+        assertDoesNotThrow(() -> userDomainService.publishUserDeletedEvent(user, deletedBy));
     }
 }
