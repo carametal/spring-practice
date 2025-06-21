@@ -28,15 +28,25 @@ public class GlobalExceptionHandler {
         ex.getBindingResult().getFieldErrors().forEach(error -> {
             Map<String, String> fieldError = new HashMap<>();
             fieldError.put("field", error.getField());
-            fieldError.put("message", error.getDefaultMessage());
-            fieldError.put("error_code", getErrorCode(error));
+            
+            String errorCode = getErrorCode(error);
+            ErrorCode errorCodeEnum = ErrorCode.findByCode(errorCode);
+            String message = errorCodeEnum != null ? errorCodeEnum.getMessage() : error.getDefaultMessage();
+            
+            fieldError.put("message", message);
+            fieldError.put("error_code", errorCode);
             fieldErrors.add(fieldError);
         });
         
         String errorMessage = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
-                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .map(error -> {
+                    String errorCode = getErrorCode(error);
+                    ErrorCode errorCodeEnum = ErrorCode.findByCode(errorCode);
+                    String message = errorCodeEnum != null ? errorCodeEnum.getMessage() : error.getDefaultMessage();
+                    return error.getField() + ": " + message;
+                })
                 .collect(Collectors.joining(", "));
         
         Map<String, Object> response = new HashMap<>();
@@ -48,29 +58,12 @@ public class GlobalExceptionHandler {
     }
     
     private String getErrorCode(FieldError error) {
-        String field = error.getField();
-        String code = error.getCode();
+        String defaultMessage = error.getDefaultMessage();
         
-        if ("username".equals(field)) {
-            if ("NotBlank".equals(code)) {
-                return ErrorCode.USER_REGISTER_USERNAME_REQUIRED.getCode();
-            } else if ("Size".equals(code)) {
-                return ErrorCode.USER_REGISTER_USERNAME_SIZE.getCode();
-            }
-        } else if ("email".equals(field)) {
-            if ("NotBlank".equals(code)) {
-                return ErrorCode.USER_REGISTER_EMAIL_REQUIRED.getCode();
-            } else if ("Email".equals(code)) {
-                return ErrorCode.USER_REGISTER_EMAIL_INVALID.getCode();
-            } else if ("Size".equals(code)) {
-                return ErrorCode.USER_REGISTER_EMAIL_SIZE.getCode();
-            }
-        } else if ("password".equals(field)) {
-            if ("NotBlank".equals(code)) {
-                return ErrorCode.USER_REGISTER_PASSWORD_REQUIRED.getCode();
-            } else if ("Size".equals(code)) {
-                return ErrorCode.USER_REGISTER_PASSWORD_SIZE.getCode();
-            }
+        if (defaultMessage != null && defaultMessage.startsWith("{") && defaultMessage.endsWith("}")) {
+            String errorCodeStr = defaultMessage.substring(1, defaultMessage.length() - 1);
+            ErrorCode errorCode = ErrorCode.findByCode(errorCodeStr);
+            return errorCode != null ? errorCode.getCode() : "UNKNOWN_ERROR";
         }
         
         return "UNKNOWN_ERROR";

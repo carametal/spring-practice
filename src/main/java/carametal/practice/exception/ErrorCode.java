@@ -3,6 +3,8 @@ package carametal.practice.exception;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
+import java.util.Arrays;
+
 @Getter
 @RequiredArgsConstructor
 public enum ErrorCode {
@@ -18,4 +20,11 @@ public enum ErrorCode {
     
     private final String code;
     private final String message;
+    
+    public static ErrorCode findByCode(String code) {
+        return Arrays.stream(values())
+                .filter(errorCode -> errorCode.getCode().equals(code))
+                .findFirst()
+                .orElse(null);
+    }
 }
