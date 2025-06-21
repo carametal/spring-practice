@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.validation.FieldError;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -28,6 +29,7 @@ public class GlobalExceptionHandler {
             Map<String, String> fieldError = new HashMap<>();
             fieldError.put("field", error.getField());
             fieldError.put("message", error.getDefaultMessage());
+            fieldError.put("error_code", getErrorCode(error));
             fieldErrors.add(fieldError);
         });
         
@@ -43,5 +45,34 @@ public class GlobalExceptionHandler {
         response.put("field_errors", fieldErrors);
         
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+    
+    private String getErrorCode(FieldError error) {
+        String field = error.getField();
+        String code = error.getCode();
+        
+        if ("username".equals(field)) {
+            if ("NotBlank".equals(code)) {
+                return ErrorCode.USER_REGISTER_USERNAME_REQUIRED.getCode();
+            } else if ("Size".equals(code)) {
+                return ErrorCode.USER_REGISTER_USERNAME_SIZE.getCode();
+            }
+        } else if ("email".equals(field)) {
+            if ("NotBlank".equals(code)) {
+                return ErrorCode.USER_REGISTER_EMAIL_REQUIRED.getCode();
+            } else if ("Email".equals(code)) {
+                return ErrorCode.USER_REGISTER_EMAIL_INVALID.getCode();
+            } else if ("Size".equals(code)) {
+                return ErrorCode.USER_REGISTER_EMAIL_SIZE.getCode();
+            }
+        } else if ("password".equals(field)) {
+            if ("NotBlank".equals(code)) {
+                return ErrorCode.USER_REGISTER_PASSWORD_REQUIRED.getCode();
+            } else if ("Size".equals(code)) {
+                return ErrorCode.USER_REGISTER_PASSWORD_SIZE.getCode();
+            }
+        }
+        
+        return "UNKNOWN_ERROR";
     }
 }
