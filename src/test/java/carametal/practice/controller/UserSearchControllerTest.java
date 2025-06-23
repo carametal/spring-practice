@@ -1,26 +1,32 @@
 package carametal.practice.controller;
 
 import carametal.practice.base.BaseIntegrationTest;
+import carametal.practice.entity.Role;
 import carametal.practice.entity.User;
+import carametal.practice.repository.RoleRepository;
 import carametal.practice.repository.UserRepository;
+import net.datafaker.Faker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import carametal.practice.dto.LoginRequest;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.jdbc.Sql;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@Sql("/test-data.sql")
+@Transactional
 class UserSearchControllerTest extends BaseIntegrationTest {
 
     @Autowired
@@ -30,116 +36,136 @@ class UserSearchControllerTest extends BaseIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
+    private final Faker faker = new Faker();
+    private User systemAdminUser;
+    private User userAdminUser;
+    private User employeeUser;
+    private Role systemAdminRole;
+    private Role userAdminRole;
+    private Role employeeRole;
+    private List<User> testUsers;
+
+    @BeforeEach
+    void setUp() {
+        setupRoles();
+        setupTestUsers();
+        createTestUsersForSearch();
+    }
+
+    private void setupRoles() {
+        systemAdminRole = createRole("SYSTEM_ADMIN", "システム管理者");
+        userAdminRole = createRole("USER_ADMIN", "ユーザー管理者");
+        employeeRole = createRole("EMPLOYEE", "従業員");
+    }
+
+    private Role createRole(String roleName, String description) {
+        Role role = Role.builder()
+                .roleName(roleName)
+                .description(description)
+                .build();
+        role.setCreatedBy(1L);
+        role.setUpdatedBy(1L);
+        return roleRepository.save(role);
+    }
+
+    private void setupTestUsers() {
+        systemAdminUser = createUser("testadmin", "testadmin@example.com", Set.of(systemAdminRole));
+        userAdminUser = createUser("useradmin", "useradmin@example.com", Set.of(userAdminRole));
+        employeeUser = createUser("employee", "employee@example.com", Set.of(employeeRole));
+    }
+
+    private void createTestUsersForSearch() {
+        testUsers = new ArrayList<>();
+        
+        // 検索テスト用のユーザーを作成
+        testUsers.add(createUser("john_doe", "john.doe@example.com", Set.of(employeeRole)));
+        testUsers.add(createUser("jane_doe", "jane.doe@test.com", Set.of(employeeRole)));
+        testUsers.add(createUser("alice_smith", "alice.smith@company.com", Set.of(employeeRole)));
+        testUsers.add(createUser("bob_johnson", "bob.johnson@enterprise.org", Set.of(employeeRole)));
+        testUsers.add(createUser("charlie_brown", "charlie@peanuts.com", Set.of(employeeRole)));
+        testUsers.add(createUser("david_wilson", "david.wilson@example.com", Set.of(employeeRole)));
+        testUsers.add(createUser("emma_davis", "emma.davis@test.org", Set.of(employeeRole)));
+        testUsers.add(createUser("frank_miller", "frank.miller@company.net", Set.of(employeeRole)));
+        testUsers.add(createUser("grace_lee", "grace.lee@example.org", Set.of(employeeRole)));
+        testUsers.add(createUser("henry_taylor", "henry.taylor@business.com", Set.of(employeeRole)));
+    }
+
+    private User createUser(String username, String email, Set<Role> roles) {
+        User user = User.builder()
+                .username(username)
+                .email(email)
+                .password(passwordEncoder.encode("password123"))
+                .registrationDate(LocalDateTime.now())
+                .roles(roles)
+                .build();
+        user.setCreatedBy(1L);
+        user.setUpdatedBy(1L);
+        return userRepository.save(user);
+    }
 
     @Test
-    @WithMockUser(roles = "SYSTEM_ADMIN")
-    void searchUsers_WithUsernameAndEmail_ReturnsMatchingUsers() throws Exception {
-        User user1 = User.builder()
-            .username("john_doe")
-            .email("john@example.com")
-            .password("password")
-            .registrationDate(LocalDateTime.now())
-            .build();
-        user1.setCreatedBy(1L);
-        user1.setUpdatedBy(1L);
-        
-        User user2 = User.builder()
-            .username("jane_doe")
-            .email("jane@test.com")
-            .password("password")
-            .registrationDate(LocalDateTime.now())
-            .build();
-        user2.setCreatedBy(1L);
-        user2.setUpdatedBy(1L);
-
-        userRepository.save(user1);
-        userRepository.save(user2);
+    void searchUsers_WithUsernamePattern_ReturnsMatchingUsers() throws Exception {
+        String token = getJwtToken(systemAdminUser.getEmail(), "password123");
 
         mockMvc.perform(get("/api/users/search")
+                .header("Authorization", "Bearer " + token)
                 .param("username", "doe"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(2)))
-                .andExpect(jsonPath("$.totalElements").value(2));
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[*].username", containsInAnyOrder("john_doe", "jane_doe")));
     }
 
     @Test
-    @WithMockUser(roles = "SYSTEM_ADMIN")
-    void searchUsers_WithUsernameOnly_ReturnsMatchingUsers() throws Exception {
-        User user = User.builder()
-            .username("john_smith")
-            .email("john@smith.com")
-            .password("password")
-            .registrationDate(LocalDateTime.now())
-            .build();
-        user.setCreatedBy(1L);
-        user.setUpdatedBy(1L);
-
-        userRepository.save(user);
+    void searchUsers_WithUsernamePartialMatch_ReturnsMatchingUsers() throws Exception {
+        String token = getJwtToken(systemAdminUser.getEmail(), "password123");
 
         mockMvc.perform(get("/api/users/search")
-                .param("username", "john"))
+                .header("Authorization", "Bearer " + token)
+                .param("username", "smith"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(1)))
-                .andExpect(jsonPath("$.content[0].username").value("john_smith"));
+                .andExpect(jsonPath("$.content[0].username").value("alice_smith"));
     }
 
     @Test
-    @WithMockUser(roles = "SYSTEM_ADMIN")
-    void searchUsers_WithEmailOnly_ReturnsMatchingUsers() throws Exception {
-        User user = User.builder()
-            .username("alice_wonder")
-            .email("alice@wonderland.com")
-            .password("password")
-            .registrationDate(LocalDateTime.now())
-            .build();
-        user.setCreatedBy(1L);
-        user.setUpdatedBy(1L);
-
-        userRepository.save(user);
+    void searchUsers_WithEmailDomainFilter_ReturnsMatchingUsers() throws Exception {
+        String token = getJwtToken(systemAdminUser.getEmail(), "password123");
 
         mockMvc.perform(get("/api/users/search")
-                .param("email", "wonderland"))
+                .header("Authorization", "Bearer " + token)
+                .param("email", "example.com"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content", hasSize(1)))
-                .andExpect(jsonPath("$.content[0].email").value("alice@wonderland.com"));
+                .andExpect(jsonPath("$.content", hasSize(greaterThanOrEqualTo(3))))
+                .andExpect(jsonPath("$.content[*].email", everyItem(containsString("example.com"))));
     }
 
     @Test
-    @WithMockUser(roles = "SYSTEM_ADMIN")
     void searchUsers_WithNoParameters_ReturnsAllUsers() throws Exception {
-        User user1 = User.builder()
-            .username("bob_builder")
-            .email("bob@builder.com")
-            .password("password")
-            .registrationDate(LocalDateTime.now())
-            .build();
-        user1.setCreatedBy(1L);
-        user1.setUpdatedBy(1L);
-        
-        User user2 = User.builder()
-            .username("charlie_brown")
-            .email("charlie@peanuts.com")
-            .password("password")
-            .registrationDate(LocalDateTime.now())
-            .build();
-        user2.setCreatedBy(1L);
-        user2.setUpdatedBy(1L);
+        String token = getJwtToken(systemAdminUser.getEmail(), "password123");
 
-        userRepository.save(user1);
-        userRepository.save(user2);
-
-        mockMvc.perform(get("/api/users/search"))
+        mockMvc.perform(get("/api/users/search")
+                .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content", hasSize(greaterThanOrEqualTo(2))))
-                .andExpect(jsonPath("$.totalElements", greaterThanOrEqualTo(2)));
+                .andExpect(jsonPath("$.content", hasSize(10))) // デフォルトページサイズ
+                .andExpect(jsonPath("$.totalElements").value(13)) // 基本ユーザー3 + テストユーザー10
+                .andExpect(jsonPath("$.totalPages").value(2));
     }
 
     @Test
-    @WithMockUser(roles = "USER")
-    void searchUsers_WithoutAdminRole_ReturnsForbidden() throws Exception {
-        mockMvc.perform(get("/api/users/search"))
+    void searchUsers_WithEmployeeRole_ReturnsForbidden() throws Exception {
+        String token = getJwtToken(employeeUser.getEmail(), "password123");
+
+        mockMvc.perform(get("/api/users/search")
+                .header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden());
     }
 
@@ -151,26 +177,26 @@ class UserSearchControllerTest extends BaseIntegrationTest {
 
     @Test
     void searchUsers_ページネーション_正常ケース() throws Exception {
-        String token = getJwtToken("testadmin@example.com", "password123");
+        String token = getJwtToken(systemAdminUser.getEmail(), "password123");
 
         mockMvc.perform(get("/api/users/search")
                 .header("Authorization", "Bearer " + token)
                 .param("page", "0")
-                .param("size", "2")
+                .param("size", "5")
                 .param("sort", "username")
                 .param("direction", "ASC"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content", hasSize(2)))
-                .andExpect(jsonPath("$.totalElements", greaterThan(2)))
-                .andExpect(jsonPath("$.totalPages", greaterThan(0)))
-                .andExpect(jsonPath("$.size", is(2)))
+                .andExpect(jsonPath("$.content", hasSize(5)))
+                .andExpect(jsonPath("$.totalElements").value(13))
+                .andExpect(jsonPath("$.totalPages").value(3))
+                .andExpect(jsonPath("$.size", is(5)))
                 .andExpect(jsonPath("$.number", is(0)))
                 .andExpect(jsonPath("$.sort.sorted", is(true)));
     }
 
     @Test
     void searchUsers_検索条件付きページネーション() throws Exception {
-        String token = getJwtToken("testadmin@example.com", "password123");
+        String token = getJwtToken(systemAdminUser.getEmail(), "password123");
 
         mockMvc.perform(get("/api/users/search")
                 .header("Authorization", "Bearer " + token)
@@ -178,77 +204,90 @@ class UserSearchControllerTest extends BaseIntegrationTest {
                 .param("page", "0")
                 .param("size", "10"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content", hasSize(greaterThanOrEqualTo(1))))
-                .andExpect(jsonPath("$.content[0].username", containsString("admin")));
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[*].username", containsInAnyOrder("testadmin", "useradmin")));
     }
 
     @Test
     void searchUsers_メール検索付きページネーション() throws Exception {
-        String token = getJwtToken("testadmin@example.com", "password123");
+        String token = getJwtToken(systemAdminUser.getEmail(), "password123");
 
         mockMvc.perform(get("/api/users/search")
                 .header("Authorization", "Bearer " + token)
-                .param("email", "example.com")
+                .param("email", "test")
                 .param("page", "0")
                 .param("size", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(greaterThanOrEqualTo(1))))
-                .andExpect(jsonPath("$.content[0].email", containsString("example.com")));
+                .andExpect(jsonPath("$.content[*].email", everyItem(containsString("test"))));
     }
 
     @Test
     void searchUsers_複数条件検索() throws Exception {
-        String token = getJwtToken("testadmin@example.com", "password123");
+        String token = getJwtToken(systemAdminUser.getEmail(), "password123");
 
         mockMvc.perform(get("/api/users/search")
                 .header("Authorization", "Bearer " + token)
-                .param("username", "test")
+                .param("username", "john")
                 .param("email", "example.com")
                 .param("page", "0")
                 .param("size", "10"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].username", containsString("test")))
-                .andExpect(jsonPath("$.content[0].email", containsString("example.com")));
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].username").value("john_doe"))
+                .andExpect(jsonPath("$.content[0].email").value("john.doe@example.com"));
     }
 
     @Test
     void searchUsers_ソート降順() throws Exception {
-        String token = getJwtToken("testadmin@example.com", "password123");
+        String token = getJwtToken(systemAdminUser.getEmail(), "password123");
 
         mockMvc.perform(get("/api/users/search")
                 .header("Authorization", "Bearer " + token)
                 .param("page", "0")
-                .param("size", "10")
-                .param("sort", "email")
+                .param("size", "5")
+                .param("sort", "username")
                 .param("direction", "DESC"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.sort.sorted", is(true)));
+                .andExpect(jsonPath("$.content", hasSize(5)))
+                .andExpect(jsonPath("$.sort.sorted", is(true)))
+                .andExpect(jsonPath("$.content[0].username").value("useradmin")) // Z→A順で最初
+                .andExpect(jsonPath("$.content[4].username").value("henry_taylor")); // 5番目
     }
 
     @Test
     void searchUsers_デフォルトパラメータ() throws Exception {
-        String token = getJwtToken("testadmin@example.com", "password123");
+        String token = getJwtToken(systemAdminUser.getEmail(), "password123");
 
         mockMvc.perform(get("/api/users/search")
                 .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size", is(10)))
-                .andExpect(jsonPath("$.number", is(0)));
+                .andExpect(jsonPath("$.number", is(0)))
+                .andExpect(jsonPath("$.totalElements").value(13));
     }
 
     @Test
-    void searchUsers_従業員権限_アクセス拒否() throws Exception {
-        String token = getJwtToken("employee@example.com", "password123");
+    void searchUsers_ユーザー管理者権限_正常ケース() throws Exception {
+        String token = getJwtToken(userAdminUser.getEmail(), "password123");
 
         mockMvc.perform(get("/api/users/search")
                 .header("Authorization", "Bearer " + token))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(10)))
+                .andExpect(jsonPath("$.totalElements").value(13));
     }
 
     @Test
-    void searchUsers_未認証_アクセス拒否_WithToken() throws Exception {
-        mockMvc.perform(get("/api/users/search"))
-                .andExpect(status().isForbidden());
+    void searchUsers_検索結果なし() throws Exception {
+        String token = getJwtToken(systemAdminUser.getEmail(), "password123");
+
+        mockMvc.perform(get("/api/users/search")
+                .header("Authorization", "Bearer " + token)
+                .param("username", "nonexistent"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(0)))
+                .andExpect(jsonPath("$.totalElements").value(0));
     }
 
     private String getJwtToken(String email, String password) throws Exception {
