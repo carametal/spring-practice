@@ -7,11 +7,16 @@ import carametal.practice.dto.UserUpdateRequest;
 import carametal.practice.dto.UserUpdateResponse;
 import carametal.practice.entity.User;
 import carametal.practice.application.UserApplicationService;
+import carametal.practice.repository.UserRepository;
+import carametal.practice.specification.UserSpecification;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
@@ -19,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserApplicationService userApplicationService;
+    private final UserRepository userRepository;
 
     @PostMapping("/register")
     @PreAuthorize("hasRole('SYSTEM_ADMIN') or hasRole('USER_ADMIN')")
@@ -61,5 +67,25 @@ public class UserController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    @GetMapping("/search")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN') or hasRole('USER_ADMIN')")
+    public ResponseEntity<List<User>> searchUsers(
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String email) {
+        
+        Specification<User> spec = Specification.where(null);
+        
+        if (username != null && !username.trim().isEmpty()) {
+            spec = spec.and(UserSpecification.hasUsernameContaining(username));
+        }
+        
+        if (email != null && !email.trim().isEmpty()) {
+            spec = spec.and(UserSpecification.hasEmailContaining(email));
+        }
+        
+        List<User> users = userRepository.findAll(spec);
+        return ResponseEntity.ok(users);
     }
 }

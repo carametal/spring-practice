@@ -54,6 +54,9 @@ docker compose up -d
 - TestcontainersConfiguration provides PostgreSQL container setup
 - Tests run with `@ServiceConnection` for automatic database configuration
 - JUnit 5 platform with Spring Boot Test framework
+- **Testing Guidelines:**
+  - Use `andExpect()` for all test assertions in MockMvc tests
+  - For database integration tests, extend `BaseIntegrationTest` to inherit pre-configured Testcontainers setup
 
 ## Code Structure
 
