@@ -11,12 +11,14 @@ import carametal.practice.repository.UserRepository;
 import carametal.practice.specification.UserSpecification;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
@@ -71,21 +73,32 @@ public class UserController {
 
     @GetMapping("/search")
     @PreAuthorize("hasRole('SYSTEM_ADMIN') or hasRole('USER_ADMIN')")
-    public ResponseEntity<List<User>> searchUsers(
+    public ResponseEntity<Page<User>> searchUsers(
             @RequestParam(required = false) String username,
-            @RequestParam(required = false) String email) {
+            @RequestParam(required = false) String email,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sort,
+            @RequestParam(defaultValue = "ASC") String direction) {
         
-        Specification<User> spec = Specification.where(null);
+        Specification<User> spec = null;
         
         if (username != null && !username.trim().isEmpty()) {
-            spec = spec.and(UserSpecification.hasUsernameContaining(username));
+            spec = UserSpecification.hasUsernameContaining(username);
         }
         
         if (email != null && !email.trim().isEmpty()) {
-            spec = spec.and(UserSpecification.hasEmailContaining(email));
+            if (spec == null) {
+                spec = UserSpecification.hasEmailContaining(email);
+            } else {
+                spec = spec.and(UserSpecification.hasEmailContaining(email));
+            }
         }
         
-        List<User> users = userRepository.findAll(spec);
+        Sort.Direction sortDirection = Sort.Direction.fromString(direction);
+        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sort));
+        
+        Page<User> users = spec != null ? userRepository.findAll(spec, pageable) : userRepository.findAll(pageable);
         return ResponseEntity.ok(users);
     }
 }

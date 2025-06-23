@@ -15,10 +15,8 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.Set;
 
-import static org.hamcrest.Matchers.is;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.hamcrest.Matchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @Sql("/test-data.sql")
@@ -383,6 +381,108 @@ class UserControllerTest extends BaseIntegrationTest {
 
         String response = result.getResponse().getContentAsString();
         return objectMapper.readTree(response).get("token").asText();
+    }
+
+    @Test
+    void searchUsers_ページネーション_正常ケース() throws Exception {
+        String token = getJwtToken("testadmin@example.com", "password123");
+
+        mockMvc.perform(get("/api/users/search")
+                .header("Authorization", "Bearer " + token)
+                .param("page", "0")
+                .param("size", "2")
+                .param("sort", "username")
+                .param("direction", "ASC"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.totalElements", greaterThan(2)))
+                .andExpect(jsonPath("$.totalPages", greaterThan(0)))
+                .andExpect(jsonPath("$.size", is(2)))
+                .andExpect(jsonPath("$.number", is(0)))
+                .andExpect(jsonPath("$.sort.sorted", is(true)));
+    }
+
+    @Test
+    void searchUsers_検索条件付きページネーション() throws Exception {
+        String token = getJwtToken("testadmin@example.com", "password123");
+
+        mockMvc.perform(get("/api/users/search")
+                .header("Authorization", "Bearer " + token)
+                .param("username", "admin")
+                .param("page", "0")
+                .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(greaterThanOrEqualTo(1))))
+                .andExpect(jsonPath("$.content[0].username", containsString("admin")));
+    }
+
+    @Test
+    void searchUsers_メール検索付きページネーション() throws Exception {
+        String token = getJwtToken("testadmin@example.com", "password123");
+
+        mockMvc.perform(get("/api/users/search")
+                .header("Authorization", "Bearer " + token)
+                .param("email", "example.com")
+                .param("page", "0")
+                .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(greaterThanOrEqualTo(1))))
+                .andExpect(jsonPath("$.content[0].email", containsString("example.com")));
+    }
+
+    @Test
+    void searchUsers_複数条件検索() throws Exception {
+        String token = getJwtToken("testadmin@example.com", "password123");
+
+        mockMvc.perform(get("/api/users/search")
+                .header("Authorization", "Bearer " + token)
+                .param("username", "test")
+                .param("email", "example.com")
+                .param("page", "0")
+                .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].username", containsString("test")))
+                .andExpect(jsonPath("$.content[0].email", containsString("example.com")));
+    }
+
+    @Test
+    void searchUsers_ソート降順() throws Exception {
+        String token = getJwtToken("testadmin@example.com", "password123");
+
+        mockMvc.perform(get("/api/users/search")
+                .header("Authorization", "Bearer " + token)
+                .param("page", "0")
+                .param("size", "10")
+                .param("sort", "email")
+                .param("direction", "DESC"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sort.sorted", is(true)));
+    }
+
+    @Test
+    void searchUsers_デフォルトパラメータ() throws Exception {
+        String token = getJwtToken("testadmin@example.com", "password123");
+
+        mockMvc.perform(get("/api/users/search")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.size", is(10)))
+                .andExpect(jsonPath("$.number", is(0)));
+    }
+
+    @Test
+    void searchUsers_従業員権限_アクセス拒否() throws Exception {
+        String token = getJwtToken("employee@example.com", "password123");
+
+        mockMvc.perform(get("/api/users/search")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void searchUsers_未認証_アクセス拒否() throws Exception {
+        mockMvc.perform(get("/api/users/search"))
+                .andExpect(status().isForbidden());
     }
 
 }
